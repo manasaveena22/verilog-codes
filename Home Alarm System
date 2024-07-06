@@ -1,0 +1,46 @@
+module HomeAlarmSystem(
+    input wire clk, rst,
+    input wire [3:0] password_input,
+    output reg door_open,
+    output reg alarm_sound
+);
+parameter PASSWORD = 4'b1010; // Change this to your desired password
+reg password_matched;
+// FSM states
+Parameter IDLE=2'b00,ENTER_PASSWORD=2'b01,ACCESS_GRANTED=2'b10,ALARM_TRIGGERED= 2'b11;
+reg [1:0] state;
+always @(posedge clk or posedge rst) begin
+    if (rst) begin
+        state <= IDLE;
+        password_matched <= 1'b0;
+        door_open <= 1'b0;
+        alarm_sound <= 1'b0;
+    end else begin
+        case (state)
+            IDLE: begin
+                if (password_input != 4'b0000) begin 
+                    state <= ENTER_PASSWORD;
+                end
+            end
+            ENTER_PASSWORD: begin
+                if (password_input == PASSWORD) begin
+                    password_matched <= 1'b1;
+                    state <= ACCESS_GRANTED;
+                end else begin
+                    password_matched <= 1'b0;
+                    state <= ALARM_TRIGGERED; // Transition to ALARM_TRIGGERED on incorrect password
+                end
+            end
+            ACCESS_GRANTED: begin
+                door_open <= 1'b1;
+                state <= IDLE;
+            end
+            ALARM_TRIGGERED: begin
+                door_open <= 1'b0; // Reset door_open signal when alarm is triggered
+                alarm_sound <= 1'b1; // Set alarm sound signal when alarm is triggered
+                state <= IDLE;
+            end
+        endcase
+    end
+end
+endmodule
