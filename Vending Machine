@@ -1,0 +1,33 @@
+module vending_machine(input clk, input rst, input N,input D, output reg y);
+  parameter s0 = 2'b00, s1 = 2'b01, s2 = 2'b10,s3=2'b11;
+  reg [1:0] state, next_state;
+  always @(posedge clk) begin
+    if (rst) state <= s0;
+    else state <= next_state;
+  end
+  always @(posedge clk) begin
+    case( state)
+      s0: begin
+        if (N) next_state = s1;
+        else if(D)next_state = s2;
+        else next_state=s0;
+        y = 0;
+      end
+      s1: begin
+        if (N) next_state = s2;
+        else if(D) next_state = s3;
+        else next_state=s1;
+        y = 0;
+      end
+      s2: begin
+        if (N) next_state = s3;
+        else next_state = s2;
+        y = 0;
+      end
+      s3: begin
+           y = 1;  
+         next_state = s0;
+         end  
+    endcase
+  end
+endmodule
