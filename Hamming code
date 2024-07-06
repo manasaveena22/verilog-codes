@@ -1,0 +1,27 @@
+//hamming encoder
+module hammingerrorcodeverilog(
+    input wire [7:1] datainput,
+    output [11:1] outputdata
+    );
+    wire p1,p2,p4,p8;
+    assign p1=datainput[1]^datainput[2]^datainput[4]^datainput[5]^datainput[7];
+    assign p2=datainput[1]^datainput[3]^datainput[4]^datainput[6]^datainput[7];
+    assign p4=datainput[2]^datainput[3]^datainput[4];
+    assign p8=datainput[5]^datainput[6]^datainput[7];
+    assign outputdata={datainput[7],datainput[6],datainput[5],p8,datainput[4],datainput[3],
+                                       datainput[2],p4,datainput[1],p2,p1};
+endmodule
+
+//hamming decoder
+module hammingerrorcodeverilog(
+    input wire [7:1] datainput,
+    output [11:1] outputdata
+    );
+    wire p1,p2,p4,p8;
+    assign p1=datainput[1]^datainput[2]^datainput[4]^datainput[5]^datainput[7];
+    assign p2=datainput[1]^datainput[3]^datainput[4]^datainput[6]^datainput[7];
+    assign p4=datainput[2]^datainput[3]^datainput[4];
+    assign p8=datainput[5]^datainput[6]^datainput[7];
+    assign outputdata={datainput[7],datainput[6],datainput[5],p8,datainput[4],datainput[3],
+                                       datainput[2],p4,datainput[1],p2,p1};
+endmodule
