@@ -1,0 +1,58 @@
+//RAM
+module RAM_4x4 (
+    input wire clk, write,
+    input wire [1:0] address,
+    input wire [3:0] data_in,
+    output reg [3:0] data_out
+);
+reg [3:0] ram_memory [0:3];                                                                                                                                               
+always @(posedge clk) begin
+    if (write) begin
+        ram_memory[address] <= data_in;
+    end
+    else begin
+        data_out <= ram_memory[address];
+    end
+end
+endmodule
+
+
+//ROM
+module ROM(clk,addr1,addr2,dout1,dout2);
+input clk;
+input [2:0] addr1,addr2;
+output reg[63:0] dout1, dout2;
+wire [63:0] loc0, loc1, loc2, loc3, loc4, loc5, loc6, loc7;
+assign loc0 = 64'h 5B5B5B5B5B5B5B5B;
+assign loc1 = 64'h 7E6A4719E7B97682;
+assign loc2 = 64'h 7631CFBABACF3176;
+assign loc3 = 64'h 6AE782B9477E1996;
+assign loc4 = 64'h 5BA5A55B5BA5A55B;
+assign loc5 = 64'h 47B2196A96E77E59;
+assign loc6 = 64'h 318A76CFCF768A31;
+assign loc7 = 64'h 19B96A827E9647E7;
+always@(posedge clk) begin
+case(addr1)
+3'b000:dout1 = loc0;
+3'b001:dout1 = loc1;
+3'b010:dout1 = loc2;
+3'b011:dout1 = loc3;
+3'b100:dout1 = loc4;
+3'b101:dout1 = loc5;
+3'b110:dout1 = loc6;
+3'b111:dout1 = loc7;
+default:dout1 = loc0;
+endcase
+case(addr2)
+3'b000:dout2 = loc0;
+3'b001:dout2 = loc1;
+3'b010:dout2 = loc2;
+3'b011:dout2 = loc3;
+3'b100:dout2 = loc4;
+3'b101:dout2 = loc5;
+3'b110:dout2 = loc6;
+3'b111:dout2 = loc7;
+default:dout2 = loc0;
+endcase
+end
+endmodule
