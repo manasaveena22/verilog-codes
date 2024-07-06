@@ -1,0 +1,194 @@
+module DigitalDelayTimer (
+    input wire clk,             // System clock
+    input wire rst,             // Asynchronous reset, active low
+    input wire mode_a,          // Mode select bit A
+    input wire mode_b,          // Mode select bit B
+    input wire [7:0] wb,        // Delay value input
+    input wire trigger,         // Input trigger signal
+    output reg delay_out        // Output signal after delay
+);
+
+    // State encoding for the different modes
+    parameter ONE_SHOT = 2'b00;
+    parameter DELAYED_OPERATE = 2'b01;
+    parameter DELAYED_RELEASE = 2'b10;
+    parameter DUAL_DELAY = 2'b11;
+
+    reg [7:0] counter;          // Counter for delay timing
+    reg delay_active;           // Flag to indicate delay is active
+    reg [1:0] mode;             // Mode of operation
+
+    reg trigger_prev;           // To detect positive edge of trigger
+
+    // Choose mode based on mode_a and mode_b inputs
+    always @* begin
+        case ({mode_a, mode_b})
+            2'b00: mode = ONE_SHOT;
+            2'b01: mode = DELAYED_OPERATE;
+            2'b10: mode = DELAYED_RELEASE;
+            2'b11: mode = DUAL_DELAY;
+            default: mode = ONE_SHOT;
+        endcase
+    end
+
+    always @(posedge clk or posedge rst) begin
+        if (rst) begin
+            counter <= 8'd0;
+            delay_out <= 1'b1;
+            delay_active <= 1'b0;
+            trigger_prev <= 1'b0;
+        end else begin
+            trigger_prev <= trigger;
+            case (mode)
+//A positive transition at the TRIG input causes OUT to switch low without delay and starts the delay timer. At the end of the programmed delay timeout, OUT switches high.If a delay timeout is in progress when a
+//positive transition occurs at the TRIG input, the delay timer will be restarted.A negative transition at the TRIG input has no effect.
+            ONE_SHOT: begin
+                if (trigger && !trigger_prev) begin  // Positive edge detected
+                    counter <= wb;    // Set counter to delay value
+                    delay_out <= 1'b0;
+                    delay_active <= 1'b1;
+                end
+                if (delay_active) begin
+                    if (counter > 0) begin
+                        counter <= counter - 1;
+                    end else begin
+                        delay_out <= 1'b1;  // End of delay, set output high
+                        delay_active <= 1'b0;
+                        end
+                    end
+                end
+//A positive transition at the TRIG input starts the delay timer. At the end of the delay timeout, OUT switches low. A negative transition at the TRIG input causes OUT to switch high without delay. OUT is high when TRIG is low.
+             DELAYED_OPERATE: begin
+                 if (trigger && !trigger_prev) begin  // Positive edge detected
+                     counter <= wb;    // Set counter to delay value
+                     delay_active <= 1'b1;
+                 end
+                 if (trigger && delay_active) begin
+                     if (counter > 0) begin
+                         counter <= counter - 1;
+                     end else begin
+                         delay_out <= 1'b0;  // End of delay, set output low
+                         delay_active <= 1'b0;
+                     end
+                     end else if (!trigger) begin  // Negative transition detected
+                        delay_out <= 1'b1;
+                        delay_active <= 1'b0;
+                    end
+                end
+// A negative transition at the TRIG input starts the delay timer. At the end of the delay timeout, OUT switches high.A postive transition at the TRIG input causes OUT to switch low without delay. OUT is low when TRIG is high.
+              DELAYED_RELEASE: begin
+                    if (!trigger && trigger_prev) begin  // Negative edge detected
+                        counter <= wb;    // Set counter to delay value
+                        delay_active <= 1'b1;
+                    end
+                    if (!trigger && delay_active) begin
+                        if (counter > 0) begin
+                            counter <= counter - 1;
+                        end else begin
+                            delay_out <= 1'b1;  // End of delay, set output high
+                            delay_active <= 1'b0;
+                        end
+                    end else if (trigger) begin  // Positive transition detected
+                        delay_out <= 1'b0;
+                        delay_active <= 1'b0;
+                    end
+                end
+//A positive or negative transition at the TRIG input starts the delay timer. At the end of the delay timeout, OUT switches to the logic state which is the inverse of the TRIG input. If a delay timeout is in
+//progress when a transition occurs at the TRIG input, the delay timer is restarted.
+              DUAL_DELAY: begin
+                  if ((trigger && !trigger_prev) || (!trigger && trigger_prev)) begin  // Any edge detected
+                       counter <= wb;    // Set counter to delay value
+                       delay_active <= 1'b1;
+                    end 
+                    if (delay_active) begin
+                        if (counter > 0) begin
+                            counter <= counter - 1;
+                        end else begin
+                            delay_out <= ~trigger;  // End of delay, set output to inverse of trigger
+                            delay_active <= 1'b0;
+                        end
+                    end
+                end
+            endcase
+        end
+    end
+endmodule
+
+module DigitalDelayTimer_tb;
+    // Testbench signals
+    reg clk;
+    reg rst;
+    reg mode_a;
+    reg mode_b;
+    reg [7:0] wb;
+    reg trigger;
+    wire delay_out;
+
+    DigitalDelayTimer dut (
+        .clk(clk),
+        .rst(rst),
+        .mode_a(mode_a),
+        .mode_b(mode_b),
+        .wb(wb),
+        .trigger(trigger),
+        .delay_out(delay_out)
+    );
+
+    // Clock generation
+    initial begin
+        clk = 0;
+        forever #5 clk = ~clk; // 10ns period clock
+    end
+
+    initial begin  // Initial settings
+        rst = 1;
+        mode_a = 0;
+        mode_b = 0;
+        wb = 8'd10;
+        trigger = 0;
+
+        #100 rst = 0;
+
+        // Test ONE_SHOT mode
+        $display("Testing ONE_SHOT mode");
+        mode_a = 0; mode_b = 0;
+        trigger = 1;
+        #1300;
+        trigger = 0;
+        #200; // Wait for 200 ns
+        
+        rst = 1;
+        #100 rst = 0;
+
+        // Test DELAYED_OPERATE mode
+        $display("Testing DELAYED_OPERATE mode");
+        mode_a = 0; mode_b = 1;
+        trigger = 1;
+        #1300 trigger = 0;
+        #200; // Wait for 200 ns
+        
+        rst = 1;
+        #100 rst = 0;
+
+        // Test DELAYED_RELEASE mode
+        $display("Testing DELAYED_RELEASE mode");
+        mode_a = 1; mode_b = 0;
+        trigger = 1;
+        #100 trigger = 0;
+        #1300; // Wait for 200 ns
+
+        rst = 1;
+        #100 rst = 0;
+
+        // Test DUAL_DELAY mode
+        $display("Testing DUAL_DELAY mode");
+        mode_a = 1; mode_b = 1;
+        trigger = 1;
+        #100 trigger = 0;
+        #1300 trigger = 1;
+        #1300; 
+
+        // End of test
+        $stop;
+    end
+endmodule
