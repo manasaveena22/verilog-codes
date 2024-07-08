@@ -1,0 +1,163 @@
+module MUL_datapath(
+    input lda, ldb, ldp, clrp, decb, clk,
+    input [15:0] a, b,
+    output eqz,
+    output reg [15:0] z
+);
+
+    wire [15:0] x, y, bout, add_out;
+    reg [15:0] sum;
+
+    PIPO1 A (.dout(x), .din(a), .ld(lda), .clk(clk));
+    PIPO2 P (.dout(y), .din(sum), .ld(ldp), .clr(clrp), .clk(clk));
+    CNTR B (.dout(bout), .din(b), .ld(ldb), .dec(decb), .clk(clk));
+    ADD AD (.out(add_out), .in1(x), .in2(sum));
+    EQZ COMP (.eqz(eqz), .data(bout));
+
+    always @(posedge clk) begin
+        if (clrp)
+            sum <= 16'b0;
+        else if (ldp)
+            sum <= add_out;
+        z <= sum;
+    end
+
+endmodule
+
+
+module PIPO1(
+    output reg [15:0] dout,
+    input [15:0] din,
+    input ld,
+    input clk
+);
+    always @(posedge clk)
+        if (ld)
+            dout <= din;
+endmodule
+module PIPO2(
+    output reg [15:0] dout,
+    input [15:0] din,
+    input ld,
+    input clr,
+    input clk
+);
+    always @(posedge clk)
+        if (clr)
+            dout <= 16'b0;
+        else if (ld)
+            dout <= din;
+endmodule
+module CNTR(
+    output reg [15:0] dout,
+    input [15:0] din,
+    input ld,
+    input dec,
+    input clk
+);
+    always @(posedge clk)
+        if (ld)
+            dout <= din;
+        else if (dec)
+            dout <= dout - 1;
+endmodule
+module ADD(
+    output [15:0] out,
+    input [15:0] in1,
+    input [15:0] in2
+);
+    assign out = in1 + in2;
+endmodule
+
+module EQZ(
+    output eqz,
+    input [15:0] data
+);
+    assign eqz = (data == 0);
+endmodule
+module controller(
+    output reg lda, ldb, ldp, clrp, decb,
+    input clk, eqz, start
+);
+    reg [2:0] state;
+    parameter s0 = 3'b000, s1 = 3'b001, s2 = 3'b010, s3 = 3'b011, s4 = 3'b100;
+
+    always @(posedge clk) begin
+        case (state)
+            s0: begin 
+                if (start) state <= s1;
+                lda = 0; ldb = 0; ldp = 0; clrp = 0; decb = 0; 
+            end
+            s1: begin 
+                state <= s2;
+                lda = 1; ldb = 0; ldp = 0; clrp = 0; decb = 0; 
+            end
+            s2: begin 
+                state <= s3;
+                lda = 0; ldb = 1; ldp = 0; clrp = 1; decb = 0; 
+            end
+            s3: begin 
+                clrp = 0;
+                if (eqz) state <= s4;
+                else begin
+                    ldp = 1; decb = 1;
+                end
+                ldb = 0; 
+            end
+            s4: begin 
+                state <= s0;
+                ldp = 0; decb = 0;
+            end
+            default: begin 
+                state <= s0;
+                lda = 0; ldb = 0; ldp = 0; clrp = 0; decb = 0; 
+            end
+        endcase
+    end
+endmodule
+
+module MUL_TEST;
+
+    reg [15:0] a, b;
+    reg clk, start;
+    wire  eqz;
+    wire lda, ldb, ldp, clrp, decb;
+    wire [15:0] z;
+
+    MUL_datapath DP (
+        .lda(lda), .ldb(ldb), .ldp(ldp), .clrp(clrp), .decb(decb),
+        .clk(clk), .a(a), .b(b), .eqz(eqz), .z(z)
+    );
+
+    controller CON (
+        .lda(lda), .ldb(ldb), .ldp(ldp), .clrp(clrp), .decb(decb),
+        .clk(clk), .eqz(eqz), .start(start)
+    );
+
+    initial begin
+        clk = 0;
+        forever #5 clk = ~clk;
+    end
+
+    initial begin
+        // Initialize inputs
+        start = 0;
+        a = 16'b0;
+        b = 16'b0;
+
+        // Apply stimulus
+        #10 start = 1; a = 16'd18; b = 16'd12;
+        #10 start = 0;
+
+        // Wait for the multiplication to complete
+        wait(eqz);
+
+        // Display the result
+        $display("Multiplication result: %d * %d = %d", a, b, z);
+
+        // Add more test cases as needed
+        #20 $stop;
+    end
+
+endmodule
+
